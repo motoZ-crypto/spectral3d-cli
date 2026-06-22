@@ -1,0 +1,10 @@
+[package]
+name = "spectral3d-cli"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+spectral3d =  { git = "https://github.com/motoZ-crypto/spectral3d", tag = "v1.0.0" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+serde_json = "1"

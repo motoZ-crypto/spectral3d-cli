@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches crate version
+        id: check
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "tag=$tag Cargo.toml version=$version"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag '$tag' does not match Cargo.toml version '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build-binaries:
+    needs: [check-version]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bin: spectral3d-cli
+            name: spectral3d-cli-linux-x86_64
+          - os: macos-latest
+            bin: spectral3d-cli
+            name: spectral3d-cli-macos-arm64
+          - os: windows-latest
+            bin: spectral3d-cli.exe
+            name: spectral3d-cli-windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --locked
+        timeout-minutes: 30
+
+      - name: Package (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -czf "${{ matrix.name }}.tar.gz" -C target/release "${{ matrix.bin }}"
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "target/release/${{ matrix.bin }}" -DestinationPath "${{ matrix.name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}.*
+
+  publish:
+    needs: [check-version, build-binaries]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ needs.check-version.outputs.version }}
+          draft: true
+          prerelease: ${{ contains(needs.check-version.outputs.version, '-') }}
+          generate_release_notes: true
+          files: artifacts/*
