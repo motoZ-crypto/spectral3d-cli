@@ -540,7 +540,7 @@ pub fn to_obj(verts: &[[f64; 3]], faces: &[[u32; 3]], r: &RepairReport) -> Strin
         "# result: closed={}, {} open edge(s), {} non-manifold edge(s)\n",
         r.closed, r.open_edges_left, r.nonmanifold_edges_left
     ));
-    out.push_str(&format!("\n"));
+    out.push('\n');
     for v in verts {
         out.push_str(&format!("v {} {} {}\n", v[0], v[1], v[2]));
     }
