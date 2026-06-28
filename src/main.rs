@@ -1,3 +1,4 @@
+mod obj;
 mod repair;
 
 use std::fs;
@@ -6,7 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use serde_json::json;
-use spectral3d::{Helper, Mesh, SpectralParams, N_FEATURES};
+use spectral3d::{Helper, SpectralParams, N_FEATURES};
 
 #[derive(Parser)]
 #[command(name = "spectral3d-cli", about = "Spectral identity and mesh repair for 3D models")]
@@ -43,9 +44,9 @@ fn main() -> Result<()> {
 }
 
 fn register(obj: PathBuf) -> Result<()> {
-    let data = fs::read(&obj).with_context(|| format!("failed to read {}", obj.display()))?;
+    let mesh = obj::load(&obj)?;
     let params = SpectralParams::default();
-    let (hash, helper) = spectral3d::register(&data, &params).map_err(|e| anyhow!("{e}"))?;
+    let (hash, helper) = spectral3d::register(mesh, &params).map_err(|e| anyhow!("{e}"))?;
 
     let offsets: Vec<f64> = helper.offsets.to_vec();
     let record = json!({"hash": hash, "helper": {"offsets": offsets}});
@@ -65,7 +66,7 @@ fn register(obj: PathBuf) -> Result<()> {
 }
 
 fn verify(obj: PathBuf, record: PathBuf) -> Result<()> {
-    let data = fs::read(&obj).with_context(|| format!("failed to read {}", obj.display()))?;
+    let mesh = obj::load(&obj)?;
     let rec_bytes =
         fs::read(&record).with_context(|| format!("failed to read {}", record.display()))?;
     let rec: serde_json::Value = serde_json::from_slice(&rec_bytes)
@@ -87,7 +88,7 @@ fn verify(obj: PathBuf, record: PathBuf) -> Result<()> {
         .map_err(|v: Vec<f64>| anyhow!("expected {N_FEATURES} offsets, got {}", v.len()))?;
 
     let params = SpectralParams::default();
-    let got = spectral3d::verify(&data, &Helper { offsets }, &params).map_err(|e| anyhow!("{e}"))?;
+    let got = spectral3d::verify(mesh, &Helper { offsets }, &params).map_err(|e| anyhow!("{e}"))?;
 
     // Same object up to pose/scale/noise iff the recovered hash equals the stored one.
     let matches = got == expected;
@@ -101,8 +102,7 @@ fn verify(obj: PathBuf, record: PathBuf) -> Result<()> {
 }
 
 fn repair(path: PathBuf) -> Result<()> {
-    let bytes = fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    let mesh = Mesh::parse_obj(&bytes).map_err(|e| anyhow!("{e}"))?;
+    let mesh = obj::load(&path)?;
 
     let stem = path
         .file_stem()

@@ -221,7 +221,7 @@ fn orient_shells(verts: &[[f64; 3]], faces: &mut [[u32; 3]]) -> usize {
     }
     let inward: HashSet<usize> = vol
         .iter()
-        .filter(|(_, &v)| v < 0.0)
+        .filter(|&(_, &v)| v < 0.0)
         .map(|(&r, _)| r)
         .collect();
     if inward.is_empty() {
@@ -261,7 +261,7 @@ fn strip_nonmanifold(faces: &mut Vec<[u32; 3]>) -> usize {
     }
     let bad: HashSet<(u32, u32)> = count
         .iter()
-        .filter(|(_, &c)| c > 2)
+        .filter(|&(_, &c)| c > 2)
         .map(|(&e, _)| e)
         .collect();
     if bad.is_empty() {
@@ -313,7 +313,7 @@ fn drop_small_components(verts: &[[f64; 3]], faces: &mut Vec<[u32; 3]>) -> usize
     let floor = total * 1e-4;
     let drop: HashSet<usize> = comp_area
         .iter()
-        .filter(|(&r, &s)| s < floor && Some(r) != biggest)
+        .filter(|&(&r, &s)| s < floor && Some(r) != biggest)
         .map(|(&r, _)| r)
         .collect();
     if drop.is_empty() {
